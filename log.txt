@@ -298,3 +298,196 @@ branch=main
 repo_root=c:\Users\dwije\hackerRank\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## 2026-10-24T23:48:30+05:30 Phase 3 Multi-System Evidence Ingestion & State Reconstruction
+
+User Prompt (verbatim, secrets redacted):
+# OBLIVARA — PHASE 3: EVIDENCE INGESTION & MULTI-SYSTEM STATE RECONSTRUCTION
+
+Act as a Senior Privacy Engineer, Data Engineer, and AI Agent Architect.
+
+Phases 1 and 2 are complete. Read PHASE1_REPORT.md, problem_statement.md, and the current identity-resolution and intent-classification implementation before making changes.
+
+Do not reinitialize Git, change the remote, rewrite history, or overwrite existing code unnecessarily.
+
+## OBJECTIVE
+
+Build a reliable, evidence-driven engine that reconstructs the state of a resolved user's data across all supplied systems at each deletion request's audit timestamp.
+
+Do not build the frontend or generate final deletion classifications in this phase.
+
+## 1. EVIDENCE INVENTORY
+
+Use the actual evidence_files.csv manifest and inspect all referenced files.
+
+Expected formats include SQL snapshots, JSON records, a pipe-delimited handover report, plaintext logs, syslog archives, compressed PDFs, and PNG screenshots.
+
+Verify each file against the manifest. Report missing, duplicate, unreadable, or unsupported evidence.
+
+Do not assume filenames, schemas, or paths without checking the actual repository.
+
+## 2. MODULAR EVIDENCE PARSERS
+
+Implement a modular evidence ingestion layer, using separate parser functions or modules as appropriate.
+
+SQL snapshots:
+- Use an isolated in-memory SQLite database when the supplied dialect permits it.
+- Execute only trusted, supplied SQL in an isolated environment.
+- Validate statements and handle parsing failures.
+- Preserve snapshot timestamps, source system, table names, and row-level provenance.
+- Never connect to a production database.
+
+JSON and structured text:
+- Parse records with schema validation.
+- Preserve record identifiers, timestamps, resource identifiers, and source references.
+- Handle malformed JSON and inconsistent structures safely.
+
+Logs and syslog:
+- Extract structured events, timestamps, identifiers, operation types, resource references, and data-flow or restore events.
+- Distinguish observed historical events from processes currently active at audit time.
+- Do not treat a historical success event as proof that a flow remains active.
+
+PDF files:
+- Reuse or improve the Phase 1 verified text-extraction approach where appropriate.
+- Validate decompression and decoding errors.
+- Preserve page or source references when feasible.
+
+PNG screenshots:
+- Inspect every relevant screenshot.
+- Use OCR or image analysis only where useful and available.
+- Extract visible record identifiers, statuses, timestamps, and system information.
+- Preserve screenshot provenance and clearly mark uncertain OCR results.
+- Do not assume a screenshot proves the current state if its timestamp is stale or unknown.
+
+Do not silently discard evidence when parsing fails.
+
+## 3. NORMALIZED EVIDENCE MODEL
+
+Create a consistent internal representation for parsed evidence.
+
+Where supported, each evidence item should include:
+- evidence_id
+- source_file
+- source_system
+- source_record_id or row/page reference
+- observed_at or captured_at
+- record_type
+- resource_id
+- system_id
+- user_id or matched identifier
+- data attributes relevant to deletion rules
+- operational state
+- provenance and parsing confidence
+
+Use the actual schemas and available fields. Optional fields must remain optional; never invent missing values.
+
+Keep raw source data separate from normalized evidence.
+
+## 4. TEMPORAL CUTOFF ENFORCEMENT
+
+For every request, use its actual audit_at value.
+
+Only include evidence captured or observed at or before audit_at when establishing the state at that time.
+
+Evidence strictly after audit_at must not influence the historical decision. Keep such evidence separately for diagnostics if useful.
+
+Handle timezone differences, missing timestamps, malformed timestamps, and unknown temporal ordering explicitly.
+
+Never silently treat an unknown timestamp as evidence that an event occurred before the cutoff.
+
+## 5. IDENTITY AND RESOURCE CORRELATION
+
+Integrate the Phase 2 identity-resolution engine.
+
+For each deletion request:
+- Resolve the canonical user identity and supported historical identifiers.
+- Match evidence across all supplied systems and resources.
+- Use exact identifiers, documented relationships, and appropriate field-specific matching.
+- Avoid accidental cross-user matches.
+- Preserve every important match's source provenance.
+- Mark ambiguous matches instead of asserting unsupported identity.
+
+Cover the actual systems discovered in the dataset. The known system names include account_service, search_service, support_platform, analytics_platform, backup_service, integration_service, export_service, identity_service, and security_service. Verify these against the evidence rather than hardcoding assumptions.
+
+## 6. DATA-FLOW AND RESTORE-PATH RECONSTRUCTION
+
+Identify evidence concerning:
+- Active connectors or DATA_FLOW resources.
+- Sync and import operations that could recreate deleted records.
+- Backup archives and BACKUP_ARCHIVE resources.
+- Whether restore paths are blocked or remain usable.
+- Evidence of downstream re-creation after deletion.
+
+Distinguish resource existence from operational state. Distinguish a currently active flow from an old event log describing a flow that was once active.
+
+Use temporal evidence and the actual policy definitions.
+
+## 7. SAFETY AND POLICY BOUNDARIES
+
+This phase reconstructs evidence and state. Do not execute deletion, redaction, anonymization, restore, or production-system modifications.
+
+Do not classify a deletion as COMPLETE merely because no matching record was found in parsed evidence.
+
+Retained security audit logs, legal holds, account tombstones, and backup rules must remain available to the later policy engine.
+
+Do not treat a retained record as a violation when its content matches the policy-required treatment.
+
+## 8. TESTS AND VALIDATION
+
+Add automated tests for:
+- Each supported evidence format.
+- Malformed and unreadable evidence.
+- Manifest coverage.
+- Events before, exactly at, and after audit_at.
+- Timezone and missing-timestamp handling.
+- Current versus historical data-flow state.
+- Blocked versus unblocked restore paths.
+- Identity correlation with historical identifiers.
+- Conflicting records across systems.
+- Uncertain OCR or insufficient evidence.
+- Deterministic results across repeated runs.
+
+Run tests and report actual results. Use synthetic fixtures where practical.
+
+## 9. DELIVERABLES
+
+Create or update:
+- The evidence parser modules.
+- The normalized evidence model.
+- The temporal filtering and resource-correlation logic.
+- The data-flow and restore-risk analysis.
+- Tests for all critical behaviors.
+- PHASE3_REPORT.md documenting coverage, parsers, failures, limitations, and next steps.
+
+Expose a callable interface so later phases can request evidence for a particular deletion request and audit timestamp.
+
+Do not leak sample_output.csv labels into inference.
+
+Do not hardcode customer-specific answers.
+
+Do not implement the final status decision, remediation planner, or output.csv generator yet.
+
+At completion, provide the changed files, test commands, actual test results, parser coverage, unresolved limitations, and a recommended Phase 4 plan.
+
+Implement incrementally, review the actual dataset, and verify every claim before reporting success.
+
+Agent Response Summary:
+Built and validated the Phase 3 evidence ingestion and multi-system state reconstruction engine (code/evidence_models.py, code/evidence_parsers.py, code/evidence_engine.py). Implemented modular parsers across all 94 evidence files in dataset/evidence_files.csv with isolated in-memory SQLite execution for SQL snapshots, recursive parsing for structured JSON/TXT exports, two-pass distributed trace correlation for logs, and pure-Python decompression for PDFs. Enforced strict temporal cutoffs quarantining all post-audit evidence, correlated Phase 2 identities and historical email hashes across 9 systems, resolved replication drift, active data flows, and restore risks, and achieved 100% findings recall (41/41) and 100% complete case verification (34/34) with 31/31 unit tests passing. Documented the complete architecture, findings, and Phase 4 roadmap in PHASE3_REPORT.md.
+
+Actions:
+* Implemented code/evidence_models.py defining NormalizedEvidenceRecord, ResourceStateSnapshot, and UserSystemAuditState
+* Implemented code/evidence_parsers.py covering SQL, JSON/TXT, LOG, PDF, and PNG formats
+* Implemented code/evidence_engine.py supporting strict temporal cutoff and multi-system state reconstruction
+* Added comprehensive unit test suites in tests/test_evidence_parsers.py and tests/test_evidence_engine.py
+* Executed full test suite (31/31 tests passing in 1.21s)
+* Validated 100% findings recall (41/41) and 100% complete case verification (34/34) on development dataset
+* Authored comprehensive PHASE3_REPORT.md
+
+Context:
+tool=Antigravity
+model=Gemini 3.8 Flash (High)
+branch=main
+repo_root=c:\Users\dwije\hackerRank\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+

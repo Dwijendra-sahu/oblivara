@@ -23,3 +23,6 @@ Thumbs.db
 # Submission archives (do not commit build zips)
 code.zip
 agent-trace.zip
+
+# Scratch scripts
+scratch/
