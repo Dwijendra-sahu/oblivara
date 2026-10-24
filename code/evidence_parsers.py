@@ -746,19 +746,22 @@ class LogParser:
         kv: Dict[str, str] = {k: v1 if v1 != "" else v2 for k, v1, v2 in raw_tokens}
 
         res_id = kv.get("resource_id", "")
-        key = kv.get("lookup_key") or kv.get("correlation_key") or kv.get("match_key") or kv.get("subject_key") or kv.get("matched_value") or kv.get("subject_reference") or kv.get("customer_reference")
+        key = kv.get("lookup_key") or kv.get("correlation_key") or kv.get("match_key") or kv.get("subject_key") or kv.get("matched_value") or kv.get("subject_reference") or kv.get("customer_reference") or kv.get("scan_key")
 
         tid = kv.get("trace_id")
         t_info = trace_context.get(tid, {}) if (trace_context and tid) else {}
 
-        # Determine user_id and email
+        # Determine user_id, email, and phone
         uid: Optional[str] = t_info.get("user_id")
         email: Optional[str] = t_info.get("email")
+        phone: Optional[str] = t_info.get("phone")
         if key:
             if key.startswith("user_"):
                 uid = key
             elif "@" in key or re.match(r'^[a-f0-9]{64}$', key.lower()):
                 email = key
+            elif "+" in key or re.search(r'\d{7,}', key):
+                phone = key
 
         if not res_id:
             res_id = t_info.get("resource_id", "")
@@ -808,7 +811,7 @@ class LogParser:
             resource_id=res_id or f"trace_{file_id}_{l_idx}",
             system_id=sys_id,
             user_id=uid or kv.get("customer_reference") or kv.get("subject_reference"),
-            matched_identifier=email or kv.get("customer_email") or kv.get("requester_email"),
+            matched_identifier=email or phone or kv.get("customer_email") or kv.get("requester_email"),
             data_attributes=kv,
             operational_state=state,
             provenance=f"LOG:{file_id}:line_{l_idx+1}",

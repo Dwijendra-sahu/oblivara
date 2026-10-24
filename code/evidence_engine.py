@@ -168,23 +168,56 @@ class EvidenceEngine:
             t_req = _parse_utc_iso(req_t)
             t_rep = _parse_utc_iso(rep_t)
             from datetime import timedelta
+            user_emails = identity.all_emails() if identity else set()
+            user_phones = identity.all_phones() if identity else set()
+            user_hashes = identity.all_email_hashes() if identity else set()
+
             for act in self.activity_stream:
                 if act.get("source_system") == "deletion_worker":
                     act_t = _parse_utc_iso(act["event_time"])
                     if (t_req - timedelta(minutes=15)) <= act_t <= (t_rep + timedelta(minutes=15)):
                         target_res = act.get("resource_id")
                         if target_res:
-                            target_resources.add(target_res)
-                            for r in self.by_resource_id.get(target_res, []):
-                                candidate_records.add(id(r))
+                            # Verify target_res does not belong to a different user
+                            res_recs = self.by_resource_id.get(target_res, [])
+                            other_user = False
+                            for r in res_recs:
+                                if r.user_id and r.user_id != user_id:
+                                    other_user = True
+                                    break
+                                if r.matched_identifier:
+                                    mid = r.matched_identifier.strip()
+                                    if "@" in mid and mid.lower() not in user_emails:
+                                        other_user = True
+                                        break
+                                    if mid.startswith("+") and mid not in user_phones:
+                                        other_user = True
+                                        break
+                            if not other_user:
+                                target_resources.add(target_res)
+                                for r in res_recs:
+                                    candidate_records.add(id(r))
 
-        # 4. Partition candidate records strictly by audit_at
+        # 4. Partition candidate records strictly by audit_at with cross-user guard
         id_map = {id(r): r for r in self.all_evidence_records}
         valid_records: List[NormalizedEvidenceRecord] = []
         post_cutoff_records: List[NormalizedEvidenceRecord] = []
 
+        user_emails = identity.all_emails() if identity else set()
+        user_phones = identity.all_phones() if identity else set()
+
         for rec_id in candidate_records:
             rec = id_map[rec_id]
+            # Cross-user contamination guard
+            if rec.user_id and rec.user_id != user_id:
+                continue
+            if rec.matched_identifier:
+                mid = rec.matched_identifier.strip()
+                if "@" in mid and mid.lower() not in user_emails:
+                    continue
+                if mid.startswith("+") and mid not in user_phones:
+                    continue
+
             cap_dt = _parse_utc_iso(rec.captured_at)
             obs_dt = _parse_utc_iso(rec.observed_at)
 
@@ -336,8 +369,12 @@ class EvidenceEngine:
         Evaluates the net state of a specific resource across all its replicas and log traces.
         Handles replication drift (e.g. absent in primary, present in failover/read replica).
         """
-        # Sort latest evidence first
-        sorted_recs = sorted(records, key=lambda x: (x.observed_at, x.captured_at), reverse=True)
+        # Sort latest evidence first, prioritizing definitive status events over start events at the same timestamp
+        def _sort_key(r: NormalizedEvidenceRecord):
+            is_definitive = 1 if (r.operational_state != OperationalState.PRESENT or "completed" in r.record_type.lower()) else 0
+            return (r.observed_at, r.captured_at, is_definitive)
+
+        sorted_recs = sorted(records, key=_sort_key, reverse=True)
         primary_rec = sorted_recs[0]
         rec_type = primary_rec.record_type
 
