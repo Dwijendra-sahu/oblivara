@@ -80,14 +80,19 @@ class IntentClassifier:
     # Priority 1: Explicit Non-Deletion Signals (Specific inquiries checked first)
     NON_DELETION_RULES: List[Tuple[re.Pattern, IntentCategory, str]] = [
         (
-            re.compile(r'\b(not\s+a\s+request\s+to\s+erase|this\s+is\s+an\s+information\s+request)\b'),
+            re.compile(r'\b(not\s+a\s+request\s+to\s+erase|not\s+asking\s+for\s+deletion|this\s+is\s+an\s+information\s+request)\b'),
             IntentCategory.DATA_ACCESS,
             "Explicitly disclaims deletion; requests information disclosure"
         ),
         (
-            re.compile(r'\b(please\s+don\'?t\s+delete|do\s+not\s+delete\s+or\s+change\s+anything)\b'),
+            re.compile(r'\b(please\s+)?(do\s+not|don\'?t|never|not\s+to)\s+(delete|erase|remove|close|cancel|anything)\b'),
             IntentCategory.DATA_ACCESS,
             "Explicitly instructs the platform not to delete account or data"
+        ),
+        (
+            re.compile(r'\b(can\s+you\s+explain\s+how|where\s+is\s+the\s+button\s+to|is\s+it\s+possible\s+to\s+see)\b'),
+            IntentCategory.SUPPORT_ASSISTANCE,
+            "Inquiry or explanation request rather than an authorized deletion instruction"
         ),
         (
             re.compile(r'\b(download\s+my\s+account\s+information|portable\s+format)\b'),
